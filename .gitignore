@@ -5,6 +5,9 @@ node_modules/
 main.js
 *.js.map
 
+# obsidian plugin runtime data (user-specific)
+data.json
+
 # obsidian
 .obsidian/
 
