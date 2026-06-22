@@ -129,10 +129,14 @@ class MyPlugin extends Plugin {
 - [x] 리본 클릭 시 실제 사용량을 Notice로 표시 (Obsidian 런타임 검증)
 - 설계: usage.ts는 순수(Node fs만) → UI와 데이터 로직 분리, 단독 테스트 가능
 
-### Phase 3: UI 구현
-- [ ] 커스텀 뷰(View) 등록
-- [ ] 사용량 바 차트 HTML/CSS 구현
-- [ ] 자동 갱신 타이머
+### Phase 3: UI 구현 (사이드바 패널) ✅
+- [x] 커스텀 View(ItemView) 등록 + 리본/커맨드로 열기 (view.ts)
+- [x] 막대 2개: **최근 5시간 + 주간**, 각각 % / 토큰 / 메시지 / 리셋 시각 (사용자 요청)
+- [x] 설정: 플랜(Pro/Max5/Max20/직접입력) → 윈도우별 추정 한도 (settings.ts)
+- [x] 자동 갱신 타이머 (registerInterval, 주기 설정 가능)
+- [x] styles.css (severity 색상: ok/warn/danger)
+- 데이터: usage.ts의 buildBlocks(entries, windowMs)를 5h/7d로 재사용
+- 한도는 추정치 → 직접입력 모드로 보정 가능
 
 ## 작업 기록
 

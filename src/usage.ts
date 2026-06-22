@@ -4,6 +4,7 @@ import * as os from "os";
 import { CurrentWindow, SessionBlock, UsageEntry } from "./types";
 
 export const FIVE_HOURS_MS = 5 * 60 * 60 * 1000;
+export const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
 export function getProjectsDir(): string {
   return path.join(os.homedir(), ".claude", "projects");
@@ -81,7 +82,9 @@ function floorToHour(timestamp: number): number {
   return timestamp - (timestamp % (60 * 60 * 1000));
 }
 
-export function buildBlocks(entries: UsageEntry[]): SessionBlock[] {
+// 윈도우 길이(windowMs)만 바꾸면 5시간/주간 등 어떤 블록도 같은 로직으로 만든다.
+// 블록 분할 규칙: 블록 시작 후 windowMs 경과 OR 직전 메시지와 windowMs 이상 간격.
+export function buildBlocks(entries: UsageEntry[], windowMs: number): SessionBlock[] {
   if (entries.length === 0) return [];
 
   const sorted = [...entries].sort((a, b) => a.timestamp - b.timestamp);
@@ -95,7 +98,7 @@ export function buildBlocks(entries: UsageEntry[]): SessionBlock[] {
     if (current.length === 0) return;
     blocks.push({
       startTime: blockStart,
-      endTime: blockStart + FIVE_HOURS_MS,
+      endTime: blockStart + windowMs,
       entries: current,
       totalTokens: current.reduce((sum, e) => sum + entryTokens(e), 0),
       messageCount: current.length,
@@ -103,8 +106,8 @@ export function buildBlocks(entries: UsageEntry[]): SessionBlock[] {
   };
 
   for (const entry of sorted) {
-    const exceedsDuration = entry.timestamp - blockStart >= FIVE_HOURS_MS;
-    const exceedsGap = entry.timestamp - lastTimestamp >= FIVE_HOURS_MS;
+    const exceedsDuration = entry.timestamp - blockStart >= windowMs;
+    const exceedsGap = entry.timestamp - lastTimestamp >= windowMs;
 
     if (current.length > 0 && (exceedsDuration || exceedsGap)) {
       flush();
@@ -133,23 +136,28 @@ export function getCurrentWindow(blocks: SessionBlock[], now: number = Date.now(
   if (blocks.length === 0) return empty;
 
   const last = blocks[blocks.length - 1];
-  const resetTime = last.startTime + FIVE_HOURS_MS;
-
-  if (now >= resetTime) return empty;
+  if (now >= last.endTime) return empty;
 
   return {
     isActive: true,
     totalTokens: last.totalTokens,
     messageCount: last.messageCount,
     blockStart: last.startTime,
-    resetTime,
-    remainingMs: resetTime - now,
+    resetTime: last.endTime,
+    remainingMs: last.endTime - now,
   };
 }
 
-export function loadCurrentWindow(now: number = Date.now()): CurrentWindow {
+export interface UsageWindows {
+  fiveHour: CurrentWindow;
+  weekly: CurrentWindow;
+}
+
+export function loadUsageWindows(now: number = Date.now()): UsageWindows {
   const files = findTranscriptFiles(getProjectsDir());
   const entries = parseUsageEntries(files);
-  const blocks = buildBlocks(entries);
-  return getCurrentWindow(blocks, now);
+  return {
+    fiveHour: getCurrentWindow(buildBlocks(entries, FIVE_HOURS_MS), now),
+    weekly: getCurrentWindow(buildBlocks(entries, WEEK_MS), now),
+  };
 }

@@ -1,38 +1,70 @@
-import { Plugin, Notice } from "obsidian";
-import { loadCurrentWindow } from "./usage";
-
-function fmtTokens(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2) + "M";
-  if (n >= 1_000) return (n / 1_000).toFixed(1) + "K";
-  return String(n);
-}
-
-function fmtDuration(ms: number): string {
-  const totalMin = Math.round(ms / 60000);
-  const h = Math.floor(totalMin / 60);
-  const m = totalMin % 60;
-  return `${h}시간 ${m}분`;
-}
+import { Plugin, WorkspaceLeaf } from "obsidian";
+import {
+  ClaudeUsageSettings,
+  ClaudeUsageSettingTab,
+  DEFAULT_SETTINGS,
+} from "./settings";
+import { ClaudeUsageView, VIEW_TYPE_CLAUDE_USAGE } from "./view";
 
 export default class ClaudeUsageBarPlugin extends Plugin {
+  settings!: ClaudeUsageSettings;
+  private refreshTimer: number | null = null;
+
   async onload() {
+    await this.loadSettings();
+
+    this.registerView(VIEW_TYPE_CLAUDE_USAGE, (leaf) => new ClaudeUsageView(leaf, this));
+
     this.addRibbonIcon("bar-chart", "Claude Usage Bar", () => {
-      const win = loadCurrentWindow();
-      if (!win.isActive) {
-        new Notice("최근 5시간 내 Claude 활동이 없습니다.");
-        return;
-      }
-      new Notice(
-        `Claude 사용량 (최근 5시간)\n` +
-          `메시지 ${win.messageCount} · 토큰 ${fmtTokens(win.totalTokens)}\n` +
-          `리셋까지 ${fmtDuration(win.remainingMs)}`
-      );
+      this.activateView();
     });
 
-    console.log("Claude Usage Bar loaded");
+    this.addCommand({
+      id: "open-claude-usage-view",
+      name: "Claude 사용량 패널 열기",
+      callback: () => this.activateView(),
+    });
+
+    this.addSettingTab(new ClaudeUsageSettingTab(this.app, this));
+
+    this.restartRefreshTimer();
   }
 
   onunload() {
-    console.log("Claude Usage Bar unloaded");
+    if (this.refreshTimer !== null) window.clearInterval(this.refreshTimer);
+  }
+
+  async activateView(): Promise<void> {
+    const { workspace } = this.app;
+
+    let leaf = workspace.getLeavesOfType(VIEW_TYPE_CLAUDE_USAGE)[0];
+    if (!leaf) {
+      leaf = workspace.getRightLeaf(false) as WorkspaceLeaf;
+      await leaf.setViewState({ type: VIEW_TYPE_CLAUDE_USAGE, active: true });
+    }
+    workspace.revealLeaf(leaf);
+  }
+
+  refreshViews(): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_CLAUDE_USAGE)) {
+      const view = leaf.view;
+      if (view instanceof ClaudeUsageView) view.render();
+    }
+  }
+
+  restartRefreshTimer(): void {
+    if (this.refreshTimer !== null) window.clearInterval(this.refreshTimer);
+    const intervalMs = this.settings.refreshIntervalSec * 1000;
+    this.refreshTimer = window.setInterval(() => this.refreshViews(), intervalMs);
+    this.registerInterval(this.refreshTimer);
+  }
+
+  async loadSettings() {
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+  }
+
+  async saveSettings() {
+    await this.saveData(this.settings);
+    this.refreshViews();
   }
 }

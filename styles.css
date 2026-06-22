@@ -1,0 +1,58 @@
+.claude-usage-view {
+  padding: 12px;
+}
+
+.cu-section {
+  margin-bottom: 18px;
+}
+
+.cu-label {
+  font-size: 0.85em;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.cu-track {
+  width: 100%;
+  height: 14px;
+  background: var(--background-modifier-border);
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.cu-fill {
+  height: 100%;
+  border-radius: 7px;
+  transition: width 0.3s ease;
+}
+
+.cu-ok {
+  background: var(--color-green);
+}
+
+.cu-warn {
+  background: var(--color-yellow);
+}
+
+.cu-danger {
+  background: var(--color-red);
+}
+
+.cu-stats {
+  margin-top: 6px;
+  font-size: 0.9em;
+  font-weight: 600;
+}
+
+.cu-meta {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.cu-empty {
+  font-size: 0.85em;
+  color: var(--text-faint);
+  font-style: italic;
+}
