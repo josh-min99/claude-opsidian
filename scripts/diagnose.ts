@@ -1,49 +1,42 @@
 import {
   FIVE_HOURS_MS,
+  WEEK_MS,
   buildBlocks,
   findTranscriptFiles,
   getProjectsDir,
   parseUsageEntries,
 } from "../src/usage";
+import { CurrentWindow, UsageEntry } from "../src/types";
 
 const entries = parseUsageEntries(findTranscriptFiles(getProjectsDir()));
-const blocks = buildBlocks(entries, FIVE_HOURS_MS);
 const now = Date.now();
-
-const last = blocks[blocks.length - 1];
-if (!last || now >= last.endTime) {
-  console.log("활성 5시간 블록 없음");
-  process.exit(0);
-}
-
-console.log("=== 현재 5시간 블록 ===");
-console.log("블록 시작:", new Date(last.startTime).toLocaleString());
-console.log("리셋:", new Date(last.endTime).toLocaleString());
-console.log("메시지 수:", last.messageCount);
-
-let input = 0, output = 0, cacheCreate = 0, cacheRead = 0;
-for (const e of last.entries) {
-  input += e.inputTokens;
-  output += e.outputTokens;
-  cacheCreate += e.cacheCreationTokens;
-  cacheRead += e.cacheReadTokens;
-}
 const fmt = (n: number) => (n / 1_000_000).toFixed(3) + "M";
 
-console.log("\n=== 토큰 구성 ===");
-console.log("input         :", fmt(input));
-console.log("output        :", fmt(output));
-console.log("cacheCreate   :", fmt(cacheCreate));
-console.log("cacheRead     :", fmt(cacheRead));
-console.log("합계(현재 metric):", fmt(input + output + cacheCreate + cacheRead));
-console.log("cacheRead 제외   :", fmt(input + output + cacheCreate));
+function activeBlockEntries(windowMs: number): UsageEntry[] {
+  const blocks = buildBlocks(entries, windowMs);
+  const last = blocks[blocks.length - 1];
+  if (!last || now >= last.endTime) return [];
+  return last.entries;
+}
 
-// 비용 가중 근사 (input=1, cacheRead=0.1, cacheCreate=1.25, output=5)
-const weighted = input * 1 + cacheRead * 0.1 + cacheCreate * 1.25 + output * 5;
-console.log("비용가중 근사    :", fmt(weighted));
+function report(label: string, windowMs: number, defaultLimit: number) {
+  const es = activeBlockEntries(windowMs);
+  let input = 0, output = 0, cacheCreate = 0, cacheRead = 0;
+  for (const e of es) {
+    input += e.inputTokens;
+    output += e.outputTokens;
+    cacheCreate += e.cacheCreationTokens;
+    cacheRead += e.cacheReadTokens;
+  }
+  const raw = input + output + cacheCreate + cacheRead;
+  const weighted = input * 1 + output * 5 + cacheCreate * 1.25 + cacheRead * 0.1;
+  console.log(`\n=== ${label} (메시지 ${es.length}) ===`);
+  console.log(`input ${fmt(input)} / output ${fmt(output)} / cacheCreate ${fmt(cacheCreate)} / cacheRead ${fmt(cacheRead)}`);
+  console.log(`raw 합계      : ${fmt(raw)}`);
+  console.log(`가중 합계     : ${fmt(weighted)}`);
+  console.log(`기본 한도     : ${fmt(defaultLimit)}`);
+  console.log(`→ 플러그인 표시 %: ${((weighted / defaultLimit) * 100).toFixed(0)}%`);
+}
 
-console.log("\n=== Claude 앱이 32%라면, 각 metric 기준 추정 한도 ===");
-const total = input + output + cacheCreate + cacheRead;
-console.log("현재 metric 기준 :", fmt(total / 0.32));
-console.log("cacheRead 제외   :", fmt((input + output + cacheCreate) / 0.32));
-console.log("비용가중 기준    :", fmt(weighted / 0.32));
+report("최근 5시간", FIVE_HOURS_MS, 4_200_000);
+report("주간", WEEK_MS, 16_000_000);

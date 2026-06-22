@@ -1,0 +1,6 @@
+{
+  "plan": "pro",
+  "fiveHourLimit": 850000,
+  "weeklyLimit": 6000000,
+  "refreshIntervalSec": 60
+}

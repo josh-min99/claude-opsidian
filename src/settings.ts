@@ -4,27 +4,36 @@ import { loadUsageWindows } from "./usage";
 
 export type Plan = "pro" | "max5" | "max20" | "custom";
 
-// 윈도우당 추정 한도(비용 가중 토큰 기준). Anthropic 비공개라 근사치이며,
-// 아래 "보정" 기능으로 Claude 실제 % 를 입력해 정확히 맞추는 것을 권장한다.
+// 윈도우당 추정 한도(비용 가중 토큰 기준). Pro 값은 실측(39%/16%)으로 보정했고,
+// Max는 플랜 배수(5x/20x)로 산정한 근사치다. 정확히는 "보정"으로 맞추는 것을 권장.
 export const PLAN_LIMITS: Record<Exclude<Plan, "custom">, { fiveHour: number; weekly: number }> = {
-  pro: { fiveHour: 850_000, weekly: 6_000_000 },
-  max5: { fiveHour: 4_200_000, weekly: 16_000_000 },
-  max20: { fiveHour: 16_800_000, weekly: 64_000_000 },
+  pro: { fiveHour: 4_000_000, weekly: 13_400_000 },
+  max5: { fiveHour: 20_000_000, weekly: 67_000_000 },
+  max20: { fiveHour: 80_000_000, weekly: 268_000_000 },
 };
 
 export interface ClaudeUsageSettings {
   plan: Plan;
-  fiveHourLimit: number;
-  weeklyLimit: number;
+  // plan === "custom" 일 때만 사용. 그 외엔 PLAN_LIMITS에서 계산한다.
+  customFiveHourLimit: number;
+  customWeeklyLimit: number;
   refreshIntervalSec: number;
 }
 
 export const DEFAULT_SETTINGS: ClaudeUsageSettings = {
-  plan: "max5",
-  fiveHourLimit: PLAN_LIMITS.max5.fiveHour,
-  weeklyLimit: PLAN_LIMITS.max5.weekly,
+  plan: "pro",
+  customFiveHourLimit: PLAN_LIMITS.pro.fiveHour,
+  customWeeklyLimit: PLAN_LIMITS.pro.weekly,
   refreshIntervalSec: 60,
 };
+
+// 한도는 저장값이 아니라 플랜에서 계산한다(프리셋 수정이 즉시 반영되도록).
+export function effectiveLimits(s: ClaudeUsageSettings): { fiveHour: number; weekly: number } {
+  if (s.plan === "custom") {
+    return { fiveHour: s.customFiveHourLimit, weekly: s.customWeeklyLimit };
+  }
+  return PLAN_LIMITS[s.plan];
+}
 
 function fmtM(n: number): string {
   return (n / 1_000_000).toFixed(2) + "M";
@@ -44,7 +53,7 @@ export class ClaudeUsageSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("플랜")
-      .setDesc("윈도우별 추정 한도(비용 가중 토큰)를 플랜에 맞춰 설정합니다.")
+      .setDesc("윈도우별 추정 한도를 플랜에 맞춰 계산합니다.")
       .addDropdown((dd) =>
         dd
           .addOption("pro", "Pro")
@@ -53,12 +62,7 @@ export class ClaudeUsageSettingTab extends PluginSettingTab {
           .addOption("custom", "직접 입력")
           .setValue(this.plugin.settings.plan)
           .onChange(async (value) => {
-            const plan = value as Plan;
-            this.plugin.settings.plan = plan;
-            if (plan !== "custom") {
-              this.plugin.settings.fiveHourLimit = PLAN_LIMITS[plan].fiveHour;
-              this.plugin.settings.weeklyLimit = PLAN_LIMITS[plan].weekly;
-            }
+            this.plugin.settings.plan = value as Plan;
             await this.plugin.saveSettings();
             this.display();
           })
@@ -66,60 +70,42 @@ export class ClaudeUsageSettingTab extends PluginSettingTab {
 
     const isCustom = this.plugin.settings.plan === "custom";
 
-    new Setting(containerEl)
-      .setName("한도: 5시간 (가중 토큰)")
-      .setDesc("직접 입력 모드에서만 수정 가능합니다.")
-      .addText((text) =>
-        text
-          .setValue(String(this.plugin.settings.fiveHourLimit))
-          .setDisabled(!isCustom)
-          .onChange(async (value) => {
+    if (isCustom) {
+      new Setting(containerEl)
+        .setName("한도: 5시간 (가중 토큰)")
+        .addText((text) =>
+          text.setValue(String(this.plugin.settings.customFiveHourLimit)).onChange(async (value) => {
             const n = Number(value);
             if (!Number.isFinite(n) || n <= 0) return;
-            this.plugin.settings.fiveHourLimit = n;
+            this.plugin.settings.customFiveHourLimit = n;
             await this.plugin.saveSettings();
           })
-      );
+        );
 
-    new Setting(containerEl)
-      .setName("한도: 주간 (가중 토큰)")
-      .setDesc("직접 입력 모드에서만 수정 가능합니다.")
-      .addText((text) =>
-        text
-          .setValue(String(this.plugin.settings.weeklyLimit))
-          .setDisabled(!isCustom)
-          .onChange(async (value) => {
+      new Setting(containerEl)
+        .setName("한도: 주간 (가중 토큰)")
+        .addText((text) =>
+          text.setValue(String(this.plugin.settings.customWeeklyLimit)).onChange(async (value) => {
             const n = Number(value);
             if (!Number.isFinite(n) || n <= 0) return;
-            this.plugin.settings.weeklyLimit = n;
+            this.plugin.settings.customWeeklyLimit = n;
             await this.plugin.saveSettings();
           })
-      );
+        );
+    }
 
     // --- 보정: Claude 앱이 보여주는 실제 % 를 입력하면 현재 측정값으로 한도를 역산한다. ---
     new Setting(containerEl).setName("보정 (Claude 실제 % 입력)").setHeading();
 
     const windows = loadUsageWindows();
 
-    this.addCalibration(
-      containerEl,
-      "5시간",
-      windows.fiveHour.totalTokens,
-      windows.fiveHour.isActive,
-      (limit) => {
-        this.plugin.settings.fiveHourLimit = limit;
-      }
-    );
+    this.addCalibration(containerEl, "5시간", windows.fiveHour.totalTokens, windows.fiveHour.isActive, (limit) => {
+      this.plugin.settings.customFiveHourLimit = limit;
+    });
 
-    this.addCalibration(
-      containerEl,
-      "주간",
-      windows.weekly.totalTokens,
-      windows.weekly.isActive,
-      (limit) => {
-        this.plugin.settings.weeklyLimit = limit;
-      }
-    );
+    this.addCalibration(containerEl, "주간", windows.weekly.totalTokens, windows.weekly.isActive, (limit) => {
+      this.plugin.settings.customWeeklyLimit = limit;
+    });
 
     new Setting(containerEl)
       .setName("자동 갱신 주기 (초)")
@@ -144,7 +130,7 @@ export class ClaudeUsageSettingTab extends PluginSettingTab {
     apply: (limit: number) => void
   ): void {
     const desc = isActive
-      ? `현재 측정 ${fmtM(measured)} (가중). Claude가 보여주는 %를 입력하면 한도를 자동 계산합니다.`
+      ? `현재 측정 ${fmtM(measured)} (가중). Claude % 를 입력하면 한도를 역산해 '직접 입력'으로 전환합니다.`
       : "활성 윈도우가 없어 지금은 보정할 수 없습니다.";
 
     new Setting(containerEl)
@@ -152,13 +138,12 @@ export class ClaudeUsageSettingTab extends PluginSettingTab {
       .setDesc(desc)
       .addText((text) =>
         text
-          .setPlaceholder("예: 32")
+          .setPlaceholder("예: 39")
           .setDisabled(!isActive)
           .onChange(async (value) => {
             const pct = Number(value);
             if (!Number.isFinite(pct) || pct <= 0 || pct > 100) return;
-            const limit = Math.round(measured / (pct / 100));
-            apply(limit);
+            apply(Math.round(measured / (pct / 100)));
             this.plugin.settings.plan = "custom";
             await this.plugin.saveSettings();
             this.display();

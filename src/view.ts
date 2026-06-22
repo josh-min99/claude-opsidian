@@ -2,6 +2,7 @@ import { ItemView, WorkspaceLeaf } from "obsidian";
 import type ClaudeUsageBarPlugin from "./main";
 import { loadUsageWindows } from "./usage";
 import { CurrentWindow } from "./types";
+import { effectiveLimits } from "./settings";
 
 export const VIEW_TYPE_CLAUDE_USAGE = "claude-usage-view";
 
@@ -56,9 +57,10 @@ export class ClaudeUsageView extends ItemView {
     container.addClass("claude-usage-view");
 
     const windows = loadUsageWindows();
+    const limits = effectiveLimits(this.plugin.settings);
 
-    this.renderBar(container as HTMLElement, "최근 5시간", windows.fiveHour, this.plugin.settings.fiveHourLimit);
-    this.renderBar(container as HTMLElement, "주간", windows.weekly, this.plugin.settings.weeklyLimit);
+    this.renderBar(container as HTMLElement, "최근 5시간", windows.fiveHour, limits.fiveHour);
+    this.renderBar(container as HTMLElement, "주간", windows.weekly, limits.weekly);
   }
 
   private renderBar(parent: HTMLElement, label: string, win: CurrentWindow, limit: number): void {
