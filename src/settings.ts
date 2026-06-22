@@ -5,12 +5,12 @@ import { loadUsageWindows } from "./usage";
 export type Plan = "pro" | "max5" | "max20" | "custom";
 
 // 윈도우당 추정 한도(비캐시 토큰 기준 = input+output+cacheCreate).
-// Pro 값은 실측 2점(5h 32%/39%, 주간 16%)으로 역산: 5h≈0.74M, 주간≈3.5M.
-// Max는 플랜 배수(5x/20x). 정확히는 "보정"으로 맞추는 것을 권장.
+// 실측 다점 평균(5h≈0.71M, 주간≈3.65M)에 가까운 깔끔한 라운드값으로 설정.
+// Max는 플랜 배수(5x/20x). 어차피 추정치라 정밀보다 가독성 우선. 정확히는 "보정" 사용.
 export const PLAN_LIMITS: Record<Exclude<Plan, "custom">, { fiveHour: number; weekly: number }> = {
-  pro: { fiveHour: 740_000, weekly: 3_500_000 },
-  max5: { fiveHour: 3_700_000, weekly: 17_500_000 },
-  max20: { fiveHour: 14_800_000, weekly: 70_000_000 },
+  pro: { fiveHour: 700_000, weekly: 3_500_000 },
+  max5: { fiveHour: 3_500_000, weekly: 17_500_000 },
+  max20: { fiveHour: 14_000_000, weekly: 70_000_000 },
 };
 
 export interface ClaudeUsageSettings {
