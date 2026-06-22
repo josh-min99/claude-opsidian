@@ -4,12 +4,13 @@ import { loadUsageWindows } from "./usage";
 
 export type Plan = "pro" | "max5" | "max20" | "custom";
 
-// 윈도우당 추정 한도(비용 가중 토큰 기준). Pro 값은 실측(39%/16%)으로 보정했고,
-// Max는 플랜 배수(5x/20x)로 산정한 근사치다. 정확히는 "보정"으로 맞추는 것을 권장.
+// 윈도우당 추정 한도(비캐시 토큰 기준 = input+output+cacheCreate).
+// Pro 값은 실측 2점(5h 32%/39%, 주간 16%)으로 역산: 5h≈0.74M, 주간≈3.5M.
+// Max는 플랜 배수(5x/20x). 정확히는 "보정"으로 맞추는 것을 권장.
 export const PLAN_LIMITS: Record<Exclude<Plan, "custom">, { fiveHour: number; weekly: number }> = {
-  pro: { fiveHour: 4_000_000, weekly: 13_400_000 },
-  max5: { fiveHour: 20_000_000, weekly: 67_000_000 },
-  max20: { fiveHour: 80_000_000, weekly: 268_000_000 },
+  pro: { fiveHour: 740_000, weekly: 3_500_000 },
+  max5: { fiveHour: 3_700_000, weekly: 17_500_000 },
+  max20: { fiveHour: 14_800_000, weekly: 70_000_000 },
 };
 
 export interface ClaudeUsageSettings {
@@ -72,7 +73,7 @@ export class ClaudeUsageSettingTab extends PluginSettingTab {
 
     if (isCustom) {
       new Setting(containerEl)
-        .setName("한도: 5시간 (가중 토큰)")
+        .setName("한도: 5시간 (비캐시 토큰)")
         .addText((text) =>
           text.setValue(String(this.plugin.settings.customFiveHourLimit)).onChange(async (value) => {
             const n = Number(value);
@@ -83,7 +84,7 @@ export class ClaudeUsageSettingTab extends PluginSettingTab {
         );
 
       new Setting(containerEl)
-        .setName("한도: 주간 (가중 토큰)")
+        .setName("한도: 주간 (비캐시 토큰)")
         .addText((text) =>
           text.setValue(String(this.plugin.settings.customWeeklyLimit)).onChange(async (value) => {
             const n = Number(value);
@@ -130,7 +131,7 @@ export class ClaudeUsageSettingTab extends PluginSettingTab {
     apply: (limit: number) => void
   ): void {
     const desc = isActive
-      ? `현재 측정 ${fmtM(measured)} (가중). Claude % 를 입력하면 한도를 역산해 '직접 입력'으로 전환합니다.`
+      ? `현재 측정 ${fmtM(measured)} (비캐시). Claude % 를 입력하면 한도를 역산해 '직접 입력'으로 전환합니다.`
       : "활성 윈도우가 없어 지금은 보정할 수 없습니다.";
 
     new Setting(containerEl)

@@ -19,9 +19,10 @@ API 키나 크레딧 없이, 내 컴퓨터의 로컬 사용 기록(`~/.claude/`)
 각 assistant 메시지의 `usage`(토큰)와 `timestamp`를 읽어, 5시간/주간 **세션 블록**으로
 묶고 현재 윈도우의 사용량을 계산한다.
 
-토큰은 단순 합산하지 않고 **비용 가중**한다(`input×1, output×5, cacheCreate×1.25, cacheRead×0.1`).
-코딩 세션은 `cache_read`가 토큰의 90%+를 차지하는데, Claude 실제 한도는 cache 읽기를 크게
-할인하기 때문이다.
+토큰은 **비캐시 토큰**(`input + output + cacheCreate`, `cache_read` 제외)으로 센다.
+코딩 세션은 `cache_read`가 토큰의 90%+를 차지하는데, Claude의 통계 화면 '총 토큰'도
+cache_read를 제외하며(로컬 데이터로 검증), 이 단위가 사용률 게이지를 더 잘 따라간다.
+덕분에 표시되는 토큰 수가 Claude 앱 통계 화면과 같은 단위가 된다.
 
 ## ⚠️ 제약
 
