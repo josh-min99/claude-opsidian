@@ -74,8 +74,22 @@ export function parseUsageEntries(files: string[]): UsageEntry[] {
   return entries;
 }
 
+// Anthropic 한도/과금은 토큰 종류별 비용이 다르다. 특히 cache 읽기는 매우 저렴(~0.1x)해
+// 단순 합산하면 cache 읽기가 수치를 지배해 실제 사용률과 어긋난다. 비용에 비례해 가중한다.
+export const TOKEN_WEIGHTS = {
+  input: 1,
+  output: 5,
+  cacheCreate: 1.25,
+  cacheRead: 0.1,
+};
+
 function entryTokens(e: UsageEntry): number {
-  return e.inputTokens + e.outputTokens + e.cacheCreationTokens + e.cacheReadTokens;
+  return (
+    e.inputTokens * TOKEN_WEIGHTS.input +
+    e.outputTokens * TOKEN_WEIGHTS.output +
+    e.cacheCreationTokens * TOKEN_WEIGHTS.cacheCreate +
+    e.cacheReadTokens * TOKEN_WEIGHTS.cacheRead
+  );
 }
 
 function floorToHour(timestamp: number): number {
