@@ -1,0 +1,25 @@
+{
+  "name": "claude-usage-bar",
+  "version": "0.1.0",
+  "description": "Obsidian plugin that shows local Claude Code / subscription usage as a bar.",
+  "main": "main.js",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production"
+  },
+  "keywords": [
+    "obsidian",
+    "claude",
+    "usage"
+  ],
+  "author": "josh-min99",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.20.0",
+    "obsidian": "latest",
+    "tslib": "^2.6.2",
+    "typescript": "^5.4.0"
+  }
+}

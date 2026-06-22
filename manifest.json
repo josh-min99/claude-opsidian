@@ -1,0 +1,10 @@
+{
+  "id": "claude-usage-bar",
+  "name": "Claude Usage Bar",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "내 Claude Code / 구독 사용량을 로컬 기록에서 읽어 바 형태로 보여줍니다.",
+  "author": "josh-min99",
+  "authorUrl": "https://github.com/josh-min99",
+  "isDesktopOnly": true
+}
