@@ -112,12 +112,22 @@ class MyPlugin extends Plugin {
 - [x] manifest.json + versions.json 작성
 - [x] 기본 Plugin 클래스 뼈대 작성 (리본 아이콘 + Notice)
 - [x] `npm install` + `npm run build` 통과 (main.js 생성 확인)
-- [ ] Obsidian vault에 연결해서 실제 로드 테스트 (vault 경로 필요)
+- [x] Obsidian vault에 junction 연결 (vault 경로 확보)
+- [x] Obsidian에서 플러그인 활성화 후 리본 아이콘 동작 확인 ✅ Phase 1 완료
 
-### Phase 2: 로컬 사용량 데이터 파싱
-- [ ] `~/.claude/projects/**/*.jsonl` 파일 목록 수집
-- [ ] assistant 메시지의 `message.usage` + timestamp 추출
-- [ ] 5시간/주간 롤링 윈도우 및 일별 집계 함수 작성
+### 개발 환경 메모
+- Vault 경로: `C:\Users\louis\OneDrive\문서\Obsidian Vault`
+- 플러그인 junction: `<Vault>\.obsidian\plugins\claude-usage-bar` → 이 작업 폴더
+- 빌드: `npm run dev`(watch) 또는 `npm run build`(1회). 빌드하면 junction 통해 Vault에 즉시 반영
+- 코드 수정 후 Obsidian에서 보려면: 빌드 → Obsidian에서 플러그인 reload (또는 Cmd/Ctrl+R)
+
+### Phase 2: 로컬 사용량 데이터 파싱 ✅
+- [x] `~/.claude/projects/**/*.jsonl` 파일 목록 수집 (`findTranscriptFiles`)
+- [x] assistant 메시지의 `message.usage` + timestamp 추출 (`parseUsageEntries`, message.id로 중복 제거)
+- [x] 5시간 세션 블록 분할 (`buildBlocks`) + 현재 윈도우 계산 (`getCurrentWindow`)
+- [x] 실제 데이터로 검증 (scripts/test-usage.ts, Obsidian 없이 node로 실행)
+- [x] 리본 클릭 시 실제 사용량을 Notice로 표시 (Obsidian 런타임 검증)
+- 설계: usage.ts는 순수(Node fs만) → UI와 데이터 로직 분리, 단독 테스트 가능
 
 ### Phase 3: UI 구현
 - [ ] 커스텀 뷰(View) 등록
